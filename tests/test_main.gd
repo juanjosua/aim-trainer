@@ -67,6 +67,12 @@ func run() -> void:
 	var spray_dy: float = main.marks[-1].global_position.y - main.EYE_HEIGHT
 	check(spray_dy > wall_range * tan(deg_to_rad(main.RECOIL_UP[-1] - main.MAX_ERROR)), "spray recoil rises %.2f m" % spray_dy)
 
+	# running into the front edge stops you, so it adds no moving error
+	main.camera.position.z = -main.bot_distance + 2
+	main.velocity = Vector3(0, 0, -6.75)
+	main._process(0.016)
+	check(main.camera.position.z == -main.bot_distance + 2 and main.velocity.z == 0, "edge zeroes velocity")
+
 	print("FAILED" if failed else "ALL PASSED")
 	quit(1 if failed else 0)
 

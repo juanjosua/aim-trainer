@@ -137,7 +137,7 @@ func _build_menu() -> void:
 	spin.max_value = 10.0
 	spin.step = 0.001
 	spin.value = sensitivity
-	spin.value_changed.connect(_on_sensitivity_changed)
+	spin.value_changed.connect(func(value: float) -> void: sensitivity = value)
 	box.add_child(row)
 
 	var resume := Button.new()
@@ -151,17 +151,20 @@ func _build_menu() -> void:
 	menu.grow_vertical = Control.GROW_DIRECTION_BOTH
 
 
-func _on_sensitivity_changed(value: float) -> void:
-	sensitivity = value
-	var cfg := ConfigFile.new()
-	cfg.set_value("mouse", "sensitivity", value)
-	cfg.save(SETTINGS_PATH)
-
-
 func _set_captured(on: bool) -> void:
+	if on and menu.visible:  # save once on closing the menu, not on every slider tick
+		var cfg := ConfigFile.new()
+		cfg.set_value("mouse", "sensitivity", sensitivity)
+		cfg.save(SETTINGS_PATH)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if on else Input.MOUSE_MODE_VISIBLE
 	menu.visible = not on
 	trigger = false
+
+
+# Alt-tab can swallow the mouse-button release, which would leave the trigger held; pause like Valorant does.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and menu:
+		_set_captured(false)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -191,9 +194,14 @@ func _process(delta: float) -> void:
 	velocity = step_velocity(velocity, Basis(Vector3.UP, deg_to_rad(yaw)) * wish, delta)
 	# shortcut: no collisions, just a box clamp that stops you before the bot's lane; add a
 	# CharacterBody3D when scenarios bring cover and walls.
-	camera.position += velocity * delta
-	camera.position.x = clampf(camera.position.x, -19, 19)
-	camera.position.z = clampf(camera.position.z, -bot_distance + 2, 19)
+	var moved := camera.position + velocity * delta
+	camera.position.x = clampf(moved.x, -19, 19)
+	camera.position.z = clampf(moved.z, -bot_distance + 2, 19)
+	# pushing into the edge is standing still, so it must not add moving error
+	if camera.position.x != moved.x:
+		velocity.x = 0
+	if camera.position.z != moved.z:
+		velocity.z = 0
 
 	cooldown -= delta
 	if not trigger:
