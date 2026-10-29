@@ -17,7 +17,7 @@ This is a lifelong hobby project, so keep each step small and playable. Backgrou
 - `project.godot`: main scene is `main.tscn`; vsync is off to cut input latency.
 - `main.tscn`: a single `Main` node; `main.gd` builds the whole scene in code (light, floor, back wall, camera, bot, HUD).
 - `main.gd`: mouse look (`counts_to_degrees`), WASD movement (`step_velocity`, `move_error`; camera moves, clamped to a box), Esc settings menu (sensitivity saved to `user://settings.cfg`, overrides the Inspector value), full-auto Vandal (`_process` + `trigger`), hitscan `shoot()` with spread and recoil (`spray` counts shots in the current spray), bullet marks, stats, HUD.
-- `bot.gd`: strafing capsule stickman; each limb is a StaticBody3D tagged `set_meta("part", "head"|"body"|"legs")`, hitbox = visible mesh; `hit(part)` returns true on a kill.
+- `bot.gd`: strafing capsule stickman with acceleration and a side-step gait (legs hang from `hips` pivots and take turns swinging out); each limb is a StaticBody3D tagged `set_meta("part", "head"|"body"|"legs")`, hitbox = visible mesh; `hit(part)` returns true on a kill. `RUN_SPEED` and `ACCEL` are shared with the player.
 - `tests/test_main.gd`: SceneTree self-test.
 
 ## Commands
@@ -42,10 +42,9 @@ Always pass `--quit-after`: a script error makes the test hang forever otherwise
 
 ## Status
 
-Layer 1: one room, one ADAD-strafing stickman bot, Valorant sens/FOV/damage, stats. Runs on my Windows PC (Godot 4.3 via winget). Vandal fire rate, first-shot error, spray error and a recoil climb are in, plus WASD movement with acceleration and moving inaccuracy, and an Esc menu for sensitivity. Numbers are mostly made up.
+Layer 1: one room, one ADAD-strafing stickman bot, Valorant sens/FOV/damage, stats. Runs on my Windows PC (Godot 4.3 via winget). Vandal fire rate, spread (standing, crouched, walking, running) and a recoil climb; WASD with Shift-walk and Ctrl-crouch; an Esc menu for sensitivity; the bot accelerates and steps. Speeds, spread and fire rate come from the official VALORANT wiki; walk/crouch speed, accel and the recoil pattern are guesses (see the table in `docs/decisions.md`).
 
 Next:
-1. Tune Vandal recoil/spread and movement accel/moving error against the real game by feel.
-2. Shift-walk, crouch; recoil that decays instead of resetting.
-3. Bot acceleration/deceleration (counter-strafe feel).
-4. Then layer 2: scenario files.
+1. Measure in Valorant and tune the guesses: cm/360, walk and crouch speed (time a known distance in the Range), recoil pattern.
+2. Recoil that decays instead of resetting; crouched horizontal recoil -15%.
+3. Then layer 2: scenario files.

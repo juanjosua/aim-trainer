@@ -3,23 +3,28 @@ extends Node3D
 const Bot := preload("res://bot.gd")
 const SETTINGS_PATH := "user://settings.cfg"
 
-# Valorant turns 0.07 degrees per mouse count at sensitivity 1.0 (same yaw as CS).
+# Valorant turns 0.07 degrees per mouse count at sensitivity 1.0 (CS uses 0.022, so 1 Valorant sens = 3.18 CS sens).
 const VALORANT_YAW := 0.07
 const EYE_HEIGHT := 1.6  # metres; 1 Godot unit = 1 m
 
-# Vandal. All unverified except fire rate; tune by feel against the real game.
+# Vandal, from the official VALORANT wiki unless marked made up; see docs/decisions.md.
 const FIRE_INTERVAL := 1.0 / 9.75  # 9.75 rounds/s
 const FIRST_SHOT_ERROR := 0.25  # degrees, standing still
-const SPRAY_ERROR := 0.15  # extra degrees of error per shot in a spray
-const MAX_ERROR := 1.5
-const RECOIL_UP := [0.0, 0.2, 0.5, 1.0, 1.6, 2.2, 2.8, 3.2]  # degrees above crosshair per spray shot; last value holds
-const RECOVERY_MS := 350  # pause this long and the next shot is a first shot again
+const SPRAY_ERROR := 0.15  # extra degrees per shot in a spray; made up
+const MAX_ERROR := 1.0
+const CROUCH_SPREAD := 0.85  # crouching multiplies first-shot and max spread
+const WALK_ERROR := 3.0  # degrees added while walking
+const RUN_ERROR := 6.0  # degrees added while running
+const RECOIL_UP := [0.0, 0.2, 0.5, 1.0, 1.6, 2.2, 2.8, 3.2]  # degrees above crosshair per spray shot, last holds; made up
+const RECOVERY_MS := 375  # pause this long and the next shot is a first shot again
 const MAX_MARKS := 30
 
-# Player movement; unverified, tune by feel. Run speed is the same as the bot's.
-const ACCEL := 40.0  # m/s^2, full speed or a full stop in ~0.17 s
-const MOVE_ERROR := 5.0  # extra degrees of error at full run speed
-const ACCURATE_SPEED := 1.4  # m/s; slower than this adds no error, which is why counter-strafing works
+# Player movement. Run speed and accel are the bot's; these are guesses, tune by feel.
+const WALK_SPEED := Bot.RUN_SPEED * 0.55
+const CROUCH_SPEED := Bot.RUN_SPEED * 0.5
+const ACCURATE_SPEED := Bot.RUN_SPEED * 0.275  # slower than this adds no error, which is why counter-strafing works
+const CROUCH_EYE := 1.1  # metres
+const CROUCH_RATE := 4.0  # m/s the eye moves when crouching or standing up
 
 @export var sensitivity := 0.4  # your in-game Valorant sensitivity
 @export var bot_distance := 15.0
@@ -40,6 +45,7 @@ var last_shot_ms := -RECOVERY_MS
 var marks: Array[Node3D] = []
 var mark_mesh := SphereMesh.new()
 var velocity := Vector3.ZERO
+var crouched := false
 var menu: PanelContainer
 
 
@@ -47,12 +53,15 @@ static func counts_to_degrees(counts: float, sens: float) -> float:
 	return counts * VALORANT_YAW * sens
 
 
-static func step_velocity(vel: Vector3, wish: Vector3, delta: float) -> Vector3:
-	return vel.move_toward(wish.normalized() * Bot.RUN_SPEED, ACCEL * delta)
+static func step_velocity(vel: Vector3, wish: Vector3, max_speed: float, delta: float) -> Vector3:
+	return vel.move_toward(wish.normalized() * max_speed, Bot.ACCEL * delta)
 
 
+## 0 when slow enough to be accurate, WALK_ERROR at walk speed, RUN_ERROR at run speed.
 static func move_error(speed: float) -> float:
-	return MOVE_ERROR * clampf((speed - ACCURATE_SPEED) / (Bot.RUN_SPEED - ACCURATE_SPEED), 0.0, 1.0)
+	var walk := clampf((speed - ACCURATE_SPEED) / (WALK_SPEED - ACCURATE_SPEED), 0.0, 1.0)
+	var run := clampf((speed - WALK_SPEED) / (Bot.RUN_SPEED - WALK_SPEED), 0.0, 1.0)
+	return WALK_ERROR * walk + (RUN_ERROR - WALK_ERROR) * run
 
 
 func _ready() -> void:
@@ -187,11 +196,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	var wish := Vector3.ZERO
+	var walking := false
+	crouched = false
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		# physical keys, so WASD sits in the same place on any keyboard layout
 		wish.x = int(Input.is_physical_key_pressed(KEY_D)) - int(Input.is_physical_key_pressed(KEY_A))
 		wish.z = int(Input.is_physical_key_pressed(KEY_S)) - int(Input.is_physical_key_pressed(KEY_W))
-	velocity = step_velocity(velocity, Basis(Vector3.UP, deg_to_rad(yaw)) * wish, delta)
+		walking = Input.is_physical_key_pressed(KEY_SHIFT)  # Valorant defaults: hold Shift to walk, Ctrl to crouch
+		crouched = Input.is_physical_key_pressed(KEY_CTRL)
+	var max_speed := CROUCH_SPEED if crouched else WALK_SPEED if walking else Bot.RUN_SPEED
+	velocity = step_velocity(velocity, Basis(Vector3.UP, deg_to_rad(yaw)) * wish, max_speed, delta)
+	camera.position.y = move_toward(camera.position.y, CROUCH_EYE if crouched else EYE_HEIGHT, CROUCH_RATE * delta)
 	# shortcut: no collisions, just a box clamp that stops you before the bot's lane; add a
 	# CharacterBody3D when scenarios bring cover and walls.
 	var moved := camera.position + velocity * delta
@@ -220,7 +235,8 @@ func shoot() -> void:
 	shots += 1
 
 	# Valorant recoil moves the bullets, not the camera: offset the ray from the crosshair.
-	var error := minf(FIRST_SHOT_ERROR + SPRAY_ERROR * spray, MAX_ERROR) + move_error(velocity.length())
+	var error := minf(FIRST_SHOT_ERROR + SPRAY_ERROR * spray, MAX_ERROR) * (CROUCH_SPREAD if crouched else 1.0)
+	error += move_error(velocity.length())
 	error *= sqrt(randf())  # uniform over the disc
 	var angle := randf() * TAU
 	var up: float = RECOIL_UP[mini(spray, RECOIL_UP.size() - 1)] + error * sin(angle)
@@ -256,4 +272,4 @@ func _mark(hit: Dictionary) -> void:
 
 func _update_hud() -> void:
 	var acc := 100.0 * hits / shots if shots else 0.0
-	hud.text = "Kills %d   Shots %d   Hits %d (%.0f%%)   Headshots %d\nWASD: move   Hold click: spray   Esc: settings" % [kills, shots, hits, acc, headshots]
+	hud.text = "Kills %d   Shots %d   Hits %d (%.0f%%)   Headshots %d\nWASD: move   Shift: walk   Ctrl: crouch   Hold click: spray   Esc: settings" % [kills, shots, hits, acc, headshots]

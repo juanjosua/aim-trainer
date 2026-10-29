@@ -21,14 +21,18 @@ func run() -> void:
 	check(absf(cm_per_360 - 20.41) < 0.01, "sensitivity gives %.2f cm/360" % cm_per_360)
 
 	# movement: finite acceleration, reaches run speed, counter-strafe stops in the same time
-	var v: Vector3 = M.step_velocity(Vector3.ZERO, Vector3.RIGHT, 0.05)
-	check(v.length() > 0 and v.length() < 6.75, "accelerates, not instant: %.2f m/s" % v.length())
-	v = M.step_velocity(Vector3.ZERO, Vector3(1, 0, 1), 1.0)
-	check(is_equal_approx(v.length(), 6.75), "diagonal capped at run speed: %.2f" % v.length())
-	v = M.step_velocity(v, Vector3.ZERO, 6.75 / M.ACCEL)
+	var Bot := preload("res://bot.gd")
+	var v: Vector3 = M.step_velocity(Vector3.ZERO, Vector3.RIGHT, Bot.RUN_SPEED, 0.05)
+	check(v.length() > 0 and v.length() < Bot.RUN_SPEED, "accelerates, not instant: %.2f m/s" % v.length())
+	v = M.step_velocity(Vector3.ZERO, Vector3(1, 0, 1), Bot.RUN_SPEED, 1.0)
+	check(is_equal_approx(v.length(), Bot.RUN_SPEED), "diagonal capped at run speed: %.2f" % v.length())
+	v = M.step_velocity(v, Vector3.ZERO, Bot.RUN_SPEED, Bot.RUN_SPEED / Bot.ACCEL)
 	check(v.is_zero_approx(), "releasing keys stops")
+	v = M.step_velocity(Vector3.ZERO, Vector3.FORWARD, M.WALK_SPEED, 1.0)
+	check(is_equal_approx(v.length(), M.WALK_SPEED), "walk caps speed: %.2f" % v.length())
 	check(M.move_error(0) == 0 and M.move_error(M.ACCURATE_SPEED) == 0, "slow enough is accurate")
-	check(is_equal_approx(M.move_error(6.75), M.MOVE_ERROR), "running adds full error")
+	check(is_equal_approx(M.move_error(M.WALK_SPEED), M.WALK_ERROR), "walking adds walk error")
+	check(is_equal_approx(M.move_error(Bot.RUN_SPEED), M.RUN_ERROR), "running adds run error")
 
 	var main: Node3D = preload("res://main.tscn").instantiate()
 	root.add_child(main)
@@ -69,9 +73,18 @@ func run() -> void:
 
 	# running into the front edge stops you, so it adds no moving error
 	main.camera.position.z = -main.bot_distance + 2
-	main.velocity = Vector3(0, 0, -6.75)
+	main.velocity = Vector3(0, 0, -5.4)
 	main._process(0.016)
 	check(main.camera.position.z == -main.bot_distance + 2 and main.velocity.z == 0, "edge zeroes velocity")
+
+	# bot speeds up instead of teleporting to full speed, and its legs open while it walks
+	main.bot.velocity = 0.0
+	main.bot.dir = 1.0
+	main.bot.turn_timer = 10.0
+	main.bot._physics_process(0.05)
+	check(main.bot.velocity > 0 and main.bot.velocity < Bot.RUN_SPEED, "bot accelerates: %.2f" % main.bot.velocity)
+	main.bot._physics_process(0.05)
+	check(main.bot.hips[0].rotation.z < 0 and main.bot.hips[1].rotation.z == 0, "one leg steps out while the other stays planted")
 
 	print("FAILED" if failed else "ALL PASSED")
 	quit(1 if failed else 0)

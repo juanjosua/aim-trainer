@@ -12,7 +12,7 @@ The app never touches the Valorant process (Vanguard anti-cheat); its only input
 
 Press Esc in game and set your Valorant sensitivity (slider or type it); it's saved for next time. Turn off Windows "Enhance pointer precision" so mouse counts match the game.
 
-Controls: mouse to aim, WASD to move, hold left click to spray, Esc for settings.
+Controls: mouse to aim, WASD to move, hold Shift to walk, hold Ctrl to crouch, hold left click to spray, Esc for settings.
 
 ## Test
 
@@ -24,20 +24,24 @@ Prints `ALL PASSED` (exit code 0) or the failing checks (exit code 1).
 
 ## What matches Valorant now
 
+From the official VALORANT wiki and sensitivity converters (details in `docs/decisions.md`):
+
 - Sensitivity: 0.07° per mouse count × your sens, so cm/360 is the same as in-game
 - 103° horizontal FOV
-- Run speed 6.75 m/s, 150 HP, Vandal damage (head one-tap, 4 body shots, legs 34)
-- Vandal fire rate 9.75/s, first-shot error, spray error and recoil climb (rough numbers)
+- Rifle run speed 5.4 m/s, 150 HP, Vandal damage (head one-tap, 4 body shots, legs 34)
+- Vandal fire rate 9.75/s; spread 0.25° first shot, 1.0° max, × 0.85 crouched, +3° walking, +6° running
+
+Still guesses: walk and crouch speed, acceleration, spray error growth and the recoil pattern.
 
 ## Progress
 
 **Layer 1, the sim: in progress**
 
 - [x] Room, camera and mouse look with Valorant sensitivity and 103° FOV
-- [x] Strafing bot (ADAD with random stops), shaped as a capsule stickman with head, body and leg hitboxes
+- [x] Strafing bot (ADAD with random stops), shaped as a capsule stickman with head, body and leg hitboxes; it speeds up, slows down and steps its legs
 - [x] Vandal damage, fire rate, full-auto, first-shot error, spray error and recoil climb
 - [x] Back wall and bullet marks, so the spray pattern is visible
-- [x] WASD movement with acceleration and moving inaccuracy (stop to shoot accurately)
+- [x] WASD movement with acceleration and moving inaccuracy (stop to shoot accurately), Shift-walk, Ctrl-crouch
 - [x] Esc settings menu for sensitivity, saved between runs
 - [x] Stats HUD and a headless self-test
 - [x] Runs on Windows with Godot 4.3
@@ -48,11 +52,9 @@ Each step stays playable on its own.
 
 **Finish layer 1 (sim feels like Valorant)**
 
-1. Tune Vandal spread and recoil against the real game by feel (the numbers are rough now).
-2. Tune movement acceleration and moving inaccuracy; add shift-walk and crouch.
-3. Recoil that decays gradually after you stop firing, instead of resetting at once.
-4. Bot acceleration and deceleration, so its strafes feel like a real player.
-5. More weapons (Phantom, Sheriff), with a key to switch.
+1. Measure in Valorant and tune the guesses: compare cm/360, time walking and crouching over a known distance in the Range, match the recoil pattern.
+2. Recoil that decays gradually after you stop firing, instead of resetting at once.
+3. More weapons (Phantom, Sheriff), with a key to switch.
 
 **Layer 2: scenario files (replay a situation by hand)**
 
