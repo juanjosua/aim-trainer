@@ -1,10 +1,9 @@
 extends Node3D
-## A bot that ADAD-strafes and sometimes stops, like a player peeking.
+## A stickman bot that ADAD-strafes and sometimes stops, like a player peeking.
 
 const RUN_SPEED := 6.75  # Valorant run speed with a rifle, m/s
 const MAX_HEALTH := 150  # 100 HP + full shields
-const HEAD_DAMAGE := 160  # Vandal head: one tap
-const BODY_DAMAGE := 40  # Vandal body: four shots
+const DAMAGE := {"head": 160, "body": 40, "legs": 34}  # Vandal: head one-tap, 4 body shots
 
 @export var lane := 4.0  # strafes within +-lane metres of centre
 
@@ -13,26 +12,39 @@ var dir := 1.0
 var turn_timer := 0.0
 
 
+# Each limb's hitbox is exactly its visible capsule; arms count as body, as in Valorant.
 func _ready() -> void:
-	var body := BoxShape3D.new()
-	body.size = Vector3(0.6, 1.4, 0.4)
-	_add_part("body", body, 0.7, Color.CRIMSON)
-	var head := SphereShape3D.new()
-	head.radius = 0.15
-	_add_part("head", head, 1.6, Color.ORANGE)
+	_add_part("head", Vector3(0, 1.6, 0), 0.15)
+	_add_part("body", Vector3(0, 1.135, 0), 0.15, 0.57)
+	_add_part("body", Vector3(-0.24, 1.11, 0), 0.05, 0.55)
+	_add_part("body", Vector3(0.24, 1.11, 0), 0.05, 0.55)
+	_add_part("legs", Vector3(-0.1, 0.425, 0), 0.08, 0.85)
+	_add_part("legs", Vector3(0.1, 0.425, 0), 0.08, 0.85)
 
 
-func _add_part(part: String, shape: Shape3D, y: float, color: Color) -> void:
+## height 0 makes a sphere, otherwise a vertical capsule of that total height.
+func _add_part(part: String, pos: Vector3, radius: float, height := 0.0) -> void:
 	var collider := StaticBody3D.new()
-	collider.position.y = y
+	collider.position = pos
 	collider.set_meta("part", part)
 	var col := CollisionShape3D.new()
-	col.shape = shape
-	collider.add_child(col)
 	var mesh := MeshInstance3D.new()
-	mesh.mesh = shape.get_debug_mesh()
+	if height == 0.0:
+		col.shape = SphereShape3D.new()
+		col.shape.radius = radius
+		mesh.mesh = SphereMesh.new()
+		mesh.mesh.radius = radius
+		mesh.mesh.height = radius * 2
+	else:
+		col.shape = CapsuleShape3D.new()
+		col.shape.radius = radius
+		col.shape.height = height
+		mesh.mesh = CapsuleMesh.new()
+		mesh.mesh.radius = radius
+		mesh.mesh.height = height
 	mesh.material_override = StandardMaterial3D.new()
-	mesh.material_override.albedo_color = color
+	mesh.material_override.albedo_color = Color.ORANGE if part == "head" else Color.CRIMSON
+	collider.add_child(col)
 	collider.add_child(mesh)
 	add_child(collider)
 
@@ -49,8 +61,8 @@ func _physics_process(delta: float) -> void:
 
 
 ## Returns true if this hit killed the bot.
-func hit(is_head: bool) -> bool:
-	health -= HEAD_DAMAGE if is_head else BODY_DAMAGE
+func hit(part: String) -> bool:
+	health -= DAMAGE[part]
 	if health > 0:
 		return false
 	health = MAX_HEALTH

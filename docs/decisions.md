@@ -39,9 +39,12 @@ Aim Lab and Kovaak's already exist. The edge here is replaying *my own* real sit
 | Horizontal FOV | 103° | Known fixed value |
 | Run speed (rifle) | 6.75 m/s | Unverified |
 | Health + full shields | 150 | Known |
-| Vandal damage | 160 head, 40 body | Unverified (no distance falloff modelled) |
+| Vandal damage | 160 head, 40 body, 34 legs | Unverified (no distance falloff modelled) |
+| Vandal fire rate | 9.75 rounds/s | Widely known |
+| Vandal first-shot error | 0.25° | Unverified |
+| Vandal spray | +0.15° error per shot (max 1.5°), climbs 0 to 3.2° over 8 shots, resets after 0.35 s | Made up; tune by feel |
 | Eye / head height | 1.6 m | Guess |
-| Head hitbox | sphere r = 0.15 m; body box 0.6 × 1.4 × 0.4 m | Guess |
+| Hitboxes | stickman: head sphere r 0.15 m, torso capsule r 0.15 m, arm capsules r 0.05 m (body damage), leg capsules r 0.08 m | Guess; slimmer than a real agent |
 
 Riot doesn't publish all weapon and movement numbers, so expect to tune by feel against the real game. That tuning never ends, and that's fine.
 

@@ -36,10 +36,26 @@ func run() -> void:
 	main.shoot()
 	check(main.hits == 2 and main.headshots == 1 and main.bot.health == 110, "body shot does 40")
 
-	# aim far left: miss
+	# aim at the right leg, 1.2 m below eye height
+	await _place_bot(main)
+	main.camera.rotation_degrees = Vector3(-rad_to_deg(atan(1.2 / main.bot_distance)), -rad_to_deg(atan(0.1 / main.bot_distance)), 0)
+	main.shoot()
+	check(main.hits == 3 and main.bot.health == 76, "leg shot does 34")
+
+	# aim far left at the wall: miss, and a first shot lands within FIRST_SHOT_ERROR
+	await _place_bot(main)
 	main.camera.rotation_degrees = Vector3(0, 30, 0)
 	main.shoot()
-	check(main.shots == 3 and main.hits == 2, "miss counts as a shot only")
+	check(main.shots == 4 and main.hits == 3, "miss counts as a shot only")
+	var wall_range: float = (main.bot_distance + 5) / cos(deg_to_rad(30))
+	var first_dy: float = main.marks[-1].global_position.y - main.EYE_HEIGHT
+	check(absf(first_dy) < wall_range * tan(deg_to_rad(main.FIRST_SHOT_ERROR)) + 0.01, "first shot error %.3f m" % first_dy)
+
+	# 8th shot of a spray climbs well above the crosshair
+	main.spray = 7
+	main.shoot()
+	var spray_dy: float = main.marks[-1].global_position.y - main.EYE_HEIGHT
+	check(spray_dy > wall_range * tan(deg_to_rad(main.RECOIL_UP[-1] - main.MAX_ERROR)), "spray recoil rises %.2f m" % spray_dy)
 
 	print("FAILED" if failed else "ALL PASSED")
 	quit(1 if failed else 0)
@@ -48,5 +64,6 @@ func run() -> void:
 func _place_bot(main: Node3D) -> void:
 	main.bot.position.x = 0
 	main.camera.rotation_degrees = Vector3.ZERO
+	main.spray = 0  # tests fire instantly, which would otherwise count as one long spray
 	await physics_frame
 	await physics_frame
