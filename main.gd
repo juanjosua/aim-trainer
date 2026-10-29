@@ -1,5 +1,8 @@
 extends Node3D
 
+const Bot := preload("res://bot.gd")
+const SETTINGS_PATH := "user://settings.cfg"
+
 # Valorant turns 0.07 degrees per mouse count at sensitivity 1.0 (same yaw as CS).
 const VALORANT_YAW := 0.07
 const EYE_HEIGHT := 1.6  # metres; 1 Godot unit = 1 m
@@ -12,6 +15,11 @@ const MAX_ERROR := 1.5
 const RECOIL_UP := [0.0, 0.2, 0.5, 1.0, 1.6, 2.2, 2.8, 3.2]  # degrees above crosshair per spray shot; last value holds
 const RECOVERY_MS := 350  # pause this long and the next shot is a first shot again
 const MAX_MARKS := 30
+
+# Player movement; unverified, tune by feel. Run speed is the same as the bot's.
+const ACCEL := 40.0  # m/s^2, full speed or a full stop in ~0.17 s
+const MOVE_ERROR := 5.0  # extra degrees of error at full run speed
+const ACCURATE_SPEED := 1.4  # m/s; slower than this adds no error, which is why counter-strafing works
 
 @export var sensitivity := 0.4  # your in-game Valorant sensitivity
 @export var bot_distance := 15.0
@@ -31,13 +39,27 @@ var spray := 0  # shots so far in the current spray
 var last_shot_ms := -RECOVERY_MS
 var marks: Array[Node3D] = []
 var mark_mesh := SphereMesh.new()
+var velocity := Vector3.ZERO
+var menu: PanelContainer
 
 
 static func counts_to_degrees(counts: float, sens: float) -> float:
 	return counts * VALORANT_YAW * sens
 
 
+static func step_velocity(vel: Vector3, wish: Vector3, delta: float) -> Vector3:
+	return vel.move_toward(wish.normalized() * Bot.RUN_SPEED, ACCEL * delta)
+
+
+static func move_error(speed: float) -> float:
+	return MOVE_ERROR * clampf((speed - ACCURATE_SPEED) / (Bot.RUN_SPEED - ACCURATE_SPEED), 0.0, 1.0)
+
+
 func _ready() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SETTINGS_PATH) == OK:
+		sensitivity = cfg.get_value("mouse", "sensitivity", sensitivity)
+
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-50, 30, 0)
 	add_child(light)
@@ -71,7 +93,7 @@ func _ready() -> void:
 	camera.fov = 103  # Valorant's fixed horizontal FOV
 	add_child(camera)
 
-	bot = preload("res://bot.gd").new()
+	bot = Bot.new()
 	bot.position.z = -bot_distance
 	add_child(bot)
 
@@ -87,7 +109,59 @@ func _ready() -> void:
 	add_child(hud)
 	_update_hud()
 
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_build_menu()
+	_set_captured(true)
+
+
+## Esc menu, like Valorant's: a slider and a text box for the same sensitivity value.
+func _build_menu() -> void:
+	menu = PanelContainer.new()
+	var box := VBoxContainer.new()
+	menu.add_child(box)
+	var title := Label.new()
+	title.text = "SETTINGS"
+	box.add_child(title)
+
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	label.text = "Sensitivity"
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.custom_minimum_size.x = 240
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(slider)
+	var spin := SpinBox.new()
+	row.add_child(spin)
+	slider.share(spin)
+	spin.min_value = 0.001
+	spin.max_value = 10.0
+	spin.step = 0.001
+	spin.value = sensitivity
+	spin.value_changed.connect(_on_sensitivity_changed)
+	box.add_child(row)
+
+	var resume := Button.new()
+	resume.text = "Resume (Esc)"
+	resume.pressed.connect(_set_captured.bind(true))
+	box.add_child(resume)
+
+	add_child(menu)
+	menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	menu.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	menu.grow_vertical = Control.GROW_DIRECTION_BOTH
+
+
+func _on_sensitivity_changed(value: float) -> void:
+	sensitivity = value
+	var cfg := ConfigFile.new()
+	cfg.set_value("mouse", "sensitivity", value)
+	cfg.save(SETTINGS_PATH)
+
+
+func _set_captured(on: bool) -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if on else Input.MOUSE_MODE_VISIBLE
+	menu.visible = not on
+	trigger = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -103,13 +177,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif captured:
 			trigger = true
 		else:
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED  # this click only captures, it doesn't fire
+			_set_captured(true)  # this click only resumes, it doesn't fire
 	elif event.is_action_pressed("ui_cancel"):
-		trigger = false
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_set_captured(not captured)
 
 
 func _process(delta: float) -> void:
+	var wish := Vector3.ZERO
+	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		# physical keys, so WASD sits in the same place on any keyboard layout
+		wish.x = int(Input.is_physical_key_pressed(KEY_D)) - int(Input.is_physical_key_pressed(KEY_A))
+		wish.z = int(Input.is_physical_key_pressed(KEY_S)) - int(Input.is_physical_key_pressed(KEY_W))
+	velocity = step_velocity(velocity, Basis(Vector3.UP, deg_to_rad(yaw)) * wish, delta)
+	# shortcut: no collisions, just a box clamp that stops you before the bot's lane; add a
+	# CharacterBody3D when scenarios bring cover and walls.
+	camera.position += velocity * delta
+	camera.position.x = clampf(camera.position.x, -19, 19)
+	camera.position.z = clampf(camera.position.z, -bot_distance + 2, 19)
+
 	cooldown -= delta
 	if not trigger:
 		cooldown = maxf(cooldown, 0.0)
@@ -118,8 +203,7 @@ func _process(delta: float) -> void:
 		cooldown += FIRE_INTERVAL  # += keeps the average rate exact despite frame timing
 
 
-# shortcut: Vandal only, no moving inaccuracy (the player can't move yet), recoil resets
-# fully after RECOVERY_MS instead of decaying; add both with player movement.
+# shortcut: Vandal only, recoil resets fully after RECOVERY_MS instead of decaying; decay it when tuning feel.
 func shoot() -> void:
 	var now := Time.get_ticks_msec()
 	if now - last_shot_ms > RECOVERY_MS:
@@ -128,7 +212,8 @@ func shoot() -> void:
 	shots += 1
 
 	# Valorant recoil moves the bullets, not the camera: offset the ray from the crosshair.
-	var error := minf(FIRST_SHOT_ERROR + SPRAY_ERROR * spray, MAX_ERROR) * sqrt(randf())  # uniform over the disc
+	var error := minf(FIRST_SHOT_ERROR + SPRAY_ERROR * spray, MAX_ERROR) + move_error(velocity.length())
+	error *= sqrt(randf())  # uniform over the disc
 	var angle := randf() * TAU
 	var up: float = RECOIL_UP[mini(spray, RECOIL_UP.size() - 1)] + error * sin(angle)
 	var side := error * cos(angle)
@@ -163,4 +248,4 @@ func _mark(hit: Dictionary) -> void:
 
 func _update_hud() -> void:
 	var acc := 100.0 * hits / shots if shots else 0.0
-	hud.text = "Kills %d   Shots %d   Hits %d (%.0f%%)   Headshots %d\nEsc: free mouse   Click: capture   Hold: spray" % [kills, shots, hits, acc, headshots]
+	hud.text = "Kills %d   Shots %d   Hits %d (%.0f%%)   Headshots %d\nWASD: move   Hold click: spray   Esc: settings" % [kills, shots, hits, acc, headshots]

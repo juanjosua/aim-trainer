@@ -43,6 +43,8 @@ Aim Lab and Kovaak's already exist. The edge here is replaying *my own* real sit
 | Vandal fire rate | 9.75 rounds/s | Widely known |
 | Vandal first-shot error | 0.25° | Unverified |
 | Vandal spray | +0.15° error per shot (max 1.5°), climbs 0 to 3.2° over 8 shots, resets after 0.35 s | Made up; tune by feel |
+| Player acceleration | 40 m/s² (full speed or full stop in ~0.17 s) | Made up; tune by feel |
+| Moving error | up to +5° at run speed; none below 1.4 m/s | Made up; tune by feel |
 | Eye / head height | 1.6 m | Guess |
 | Hitboxes | stickman: head sphere r 0.15 m, torso capsule r 0.15 m, arm capsules r 0.05 m (body damage), leg capsules r 0.08 m | Guess; slimmer than a real agent |
 

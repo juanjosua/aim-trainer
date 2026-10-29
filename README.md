@@ -10,9 +10,9 @@ The app never touches the Valorant process (Vanguard anti-cheat); its only input
 2. Open Godot, then **Import** and pick this folder's `project.godot`.
 3. Press **F5**.
 
-Set `sensitivity` on the `Main` node (Inspector) to your Valorant sensitivity. Turn off Windows "Enhance pointer precision" so mouse counts match the game.
+Press Esc in game and set your Valorant sensitivity (slider or type it); it's saved for next time. Turn off Windows "Enhance pointer precision" so mouse counts match the game.
 
-Controls: mouse to aim, hold left click to spray, Esc to free the mouse.
+Controls: mouse to aim, WASD to move, hold left click to spray, Esc for settings.
 
 ## Test
 
@@ -37,6 +37,8 @@ Prints `ALL PASSED` (exit code 0) or the failing checks (exit code 1).
 - [x] Strafing bot (ADAD with random stops), shaped as a capsule stickman with head, body and leg hitboxes
 - [x] Vandal damage, fire rate, full-auto, first-shot error, spray error and recoil climb
 - [x] Back wall and bullet marks, so the spray pattern is visible
+- [x] WASD movement with acceleration and moving inaccuracy (stop to shoot accurately)
+- [x] Esc settings menu for sensitivity, saved between runs
 - [x] Stats HUD and a headless self-test
 - [x] Runs on Windows with Godot 4.3
 
@@ -47,7 +49,7 @@ Each step stays playable on its own.
 **Finish layer 1 (sim feels like Valorant)**
 
 1. Tune Vandal spread and recoil against the real game by feel (the numbers are rough now).
-2. Player movement (WASD) with Valorant run speed, moving inaccuracy and counter-strafing.
+2. Tune movement acceleration and moving inaccuracy; add shift-walk and crouch.
 3. Recoil that decays gradually after you stop firing, instead of resetting at once.
 4. Bot acceleration and deceleration, so its strafes feel like a real player.
 5. More weapons (Phantom, Sheriff), with a key to switch.

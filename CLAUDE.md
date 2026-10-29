@@ -16,7 +16,7 @@ This is a lifelong hobby project, so keep each step small and playable. Backgrou
 
 - `project.godot`: main scene is `main.tscn`; vsync is off to cut input latency.
 - `main.tscn`: a single `Main` node; `main.gd` builds the whole scene in code (light, floor, back wall, camera, bot, HUD).
-- `main.gd`: mouse look (`counts_to_degrees`), full-auto Vandal (`_process` + `trigger`), hitscan `shoot()` with spread and recoil (`spray` counts shots in the current spray), bullet marks, stats, HUD.
+- `main.gd`: mouse look (`counts_to_degrees`), WASD movement (`step_velocity`, `move_error`; camera moves, clamped to a box), Esc settings menu (sensitivity saved to `user://settings.cfg`, overrides the Inspector value), full-auto Vandal (`_process` + `trigger`), hitscan `shoot()` with spread and recoil (`spray` counts shots in the current spray), bullet marks, stats, HUD.
 - `bot.gd`: strafing capsule stickman; each limb is a StaticBody3D tagged `set_meta("part", "head"|"body"|"legs")`, hitbox = visible mesh; `hit(part)` returns true on a kill.
 - `tests/test_main.gd`: SceneTree self-test.
 
@@ -42,10 +42,10 @@ Always pass `--quit-after`: a script error makes the test hang forever otherwise
 
 ## Status
 
-Layer 1: one room, one ADAD-strafing stickman bot, Valorant sens/FOV/damage, stats. Runs on my Windows PC (Godot 4.3 via winget). Vandal fire rate, first-shot error, spray error and a recoil climb are in, with made-up numbers.
+Layer 1: one room, one ADAD-strafing stickman bot, Valorant sens/FOV/damage, stats. Runs on my Windows PC (Godot 4.3 via winget). Vandal fire rate, first-shot error, spray error and a recoil climb are in, plus WASD movement with acceleration and moving inaccuracy, and an Esc menu for sensitivity. Numbers are mostly made up.
 
 Next:
-1. Tune the Vandal recoil/spread numbers against the real game by feel.
-2. Player movement (WASD) with moving inaccuracy; recoil that decays instead of resetting.
+1. Tune Vandal recoil/spread and movement accel/moving error against the real game by feel.
+2. Shift-walk, crouch; recoil that decays instead of resetting.
 3. Bot acceleration/deceleration (counter-strafe feel).
 4. Then layer 2: scenario files.

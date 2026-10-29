@@ -20,6 +20,16 @@ func run() -> void:
 	var cm_per_360 := 360.0 / M.counts_to_degrees(1, 0.4) / 1600.0 * 2.54
 	check(absf(cm_per_360 - 20.41) < 0.01, "sensitivity gives %.2f cm/360" % cm_per_360)
 
+	# movement: finite acceleration, reaches run speed, counter-strafe stops in the same time
+	var v: Vector3 = M.step_velocity(Vector3.ZERO, Vector3.RIGHT, 0.05)
+	check(v.length() > 0 and v.length() < 6.75, "accelerates, not instant: %.2f m/s" % v.length())
+	v = M.step_velocity(Vector3.ZERO, Vector3(1, 0, 1), 1.0)
+	check(is_equal_approx(v.length(), 6.75), "diagonal capped at run speed: %.2f" % v.length())
+	v = M.step_velocity(v, Vector3.ZERO, 6.75 / M.ACCEL)
+	check(v.is_zero_approx(), "releasing keys stops")
+	check(M.move_error(0) == 0 and M.move_error(M.ACCURATE_SPEED) == 0, "slow enough is accurate")
+	check(is_equal_approx(M.move_error(6.75), M.MOVE_ERROR), "running adds full error")
+
 	var main: Node3D = preload("res://main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame  # _ready runs once the tree starts ticking
